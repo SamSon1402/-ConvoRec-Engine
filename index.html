@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConvoRec-Engine — Hybrid Conversational Recommender | Lemrock</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --lem-blue:#3b82f6; --lem-indigo:#6366f1; --lem-violet:#8b5cf6;
+            --lem-cyan:#06b6d4; --lem-emerald:#10b981; --lem-amber:#f59e0b;
+            --lem-rose:#f43f5e; --lem-orange:#f97316; --lem-fuchsia:#d946ef;
+            --bg-0:#030712; --bg-1:#0a0f1e; --bg-2:#111827; --bg-3:#1f2937;
+            --text-0:#f9fafb; --text-1:#d1d5db; --text-2:#9ca3af; --text-3:#6b7280;
+            --border:rgba(255,255,255,0.08);
+            --grad:linear-gradient(135deg,var(--lem-orange),var(--lem-rose),var(--lem-fuchsia));
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Outfit',sans-serif;background:var(--bg-0);color:var(--text-0);min-height:100vh;
+            background-image:radial-gradient(ellipse at 25% 75%,rgba(249,115,22,0.06) 0%,transparent 50%),radial-gradient(ellipse at 75% 25%,rgba(217,70,239,0.05) 0%,transparent 50%);}
+
+        .header{background:rgba(10,15,30,0.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:0.65rem 2rem;position:sticky;top:0;z-index:100;}
+        .header-inner{max-width:1900px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;}
+        .logo{display:flex;align-items:center;gap:0.7rem;}
+        .logo-mark{width:42px;height:42px;border-radius:10px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:1.2rem;position:relative;}
+        .logo-mark::after{content:'';position:absolute;inset:-3px;border-radius:13px;background:var(--grad);z-index:-1;opacity:0.45;filter:blur(10px);}
+        .logo-name{font-size:1.35rem;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+        .logo-sub{font-size:0.55rem;color:var(--text-3);letter-spacing:3px;text-transform:uppercase;font-weight:500;}
+        .badges{display:flex;gap:0.35rem;flex-wrap:wrap;}
+        .badge{background:var(--bg-2);border:1px solid var(--border);padding:0.3rem 0.65rem;border-radius:6px;font-size:0.6rem;color:var(--text-2);font-family:'JetBrains Mono',monospace;}
+        .badge.live{background:rgba(249,115,22,0.12);border-color:var(--lem-orange);color:var(--lem-orange);}
+        .badge.live::before{content:'';display:inline-block;width:6px;height:6px;background:var(--lem-orange);border-radius:50%;margin-right:5px;animation:pulse 1.4s ease-in-out infinite;}
+        @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+        .main{max-width:1900px;margin:0 auto;padding:1.25rem 2rem;}
+        .hero{text-align:center;margin-bottom:1.25rem;}
+        .hero h1{font-size:2rem;font-weight:900;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.3rem;}
+        .hero p{color:var(--text-2);font-size:0.9rem;}
+
+        .workspace{display:grid;grid-template-columns:420px 1fr 380px;gap:1rem;}
+        @media(max-width:1400px){.workspace{grid-template-columns:1fr;}}
+
+        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+        .card-head{padding:0.85rem 1.15rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(31,41,55,0.5) 0%,transparent 100%);}
+        .card-title{font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:0.45rem;}
+        .card-body{padding:1.15rem;}
+
+        /* CHAT INTERFACE */
+        .chat-window{display:flex;flex-direction:column;height:580px;}
+        .chat-messages{flex:1;overflow-y:auto;padding:0.5rem;display:flex;flex-direction:column;gap:0.5rem;}
+        .chat-msg{max-width:90%;padding:0.7rem 0.9rem;border-radius:12px;animation:chatIn 0.3s ease;line-height:1.45;}
+        .chat-msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--lem-orange),var(--lem-rose));color:white;border-bottom-right-radius:4px;font-size:0.82rem;}
+        .chat-msg.agent{align-self:flex-start;background:var(--bg-2);border:1px solid var(--border);border-bottom-left-radius:4px;font-size:0.82rem;}
+        .chat-msg.system{align-self:center;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);font-size:0.7rem;color:var(--text-2);padding:0.4rem 0.8rem;border-radius:20px;}
+        @keyframes chatIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+        .chat-input-wrap{display:flex;gap:0.5rem;padding:0.75rem;border-top:1px solid var(--border);background:var(--bg-2);}
+        .chat-input{flex:1;background:var(--bg-0);border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.9rem;color:var(--text-0);font-family:'Outfit',sans-serif;font-size:0.82rem;outline:none;transition:border-color 0.2s;}
+        .chat-input:focus{border-color:var(--lem-orange);}
+        .chat-input::placeholder{color:var(--text-3);}
+        .send-btn{background:var(--grad);border:none;border-radius:10px;padding:0.6rem 1rem;color:white;font-weight:700;cursor:pointer;font-size:0.8rem;transition:opacity 0.2s;}
+        .send-btn:hover{opacity:0.85;}
+
+        /* PRODUCT RECS */
+        .rec-grid{display:flex;flex-direction:column;gap:0.6rem;max-height:580px;overflow-y:auto;}
+        .rec-card{background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:0.85rem;transition:all 0.3s;cursor:default;animation:recIn 0.4s ease;}
+        .rec-card:hover{border-color:var(--lem-orange);transform:translateY(-2px);box-shadow:0 8px 25px rgba(249,115,22,0.1);}
+        @keyframes recIn{from{opacity:0;transform:translateX(12px);}to{opacity:1;transform:translateX(0);}}
+        .rec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;}
+        .rec-name{font-size:0.82rem;font-weight:700;flex:1;}
+        .rec-score{font-size:0.9rem;font-weight:800;font-family:'JetBrains Mono',monospace;padding:0.15rem 0.45rem;border-radius:6px;background:rgba(249,115,22,0.15);color:var(--lem-orange);}
+        .rec-brand{font-size:0.62rem;color:var(--text-3);margin-bottom:0.35rem;}
+        .rec-price{font-size:1rem;font-weight:800;color:var(--lem-emerald);margin-bottom:0.35rem;}
+        .rec-tags{display:flex;gap:0.3rem;flex-wrap:wrap;}
+        .rec-tag{font-size:0.55rem;padding:0.15rem 0.4rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-weight:500;}
+        .rec-tag.collab{background:rgba(59,130,246,0.15);color:var(--lem-blue);}
+        .rec-tag.semantic{background:rgba(139,92,246,0.15);color:var(--lem-violet);}
+        .rec-tag.context{background:rgba(6,182,212,0.15);color:var(--lem-cyan);}
+        .rec-tag.price{background:rgba(16,185,129,0.15);color:var(--lem-emerald);}
+        .rec-why{font-size:0.65rem;color:var(--text-2);margin-top:0.35rem;font-style:italic;border-left:2px solid var(--lem-orange);padding-left:0.5rem;}
+
+        /* SIDEBAR METRICS */
+        .sidebar{display:flex;flex-direction:column;gap:1rem;}
+
+        /* Engine stats */
+        .engine-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:0.5rem;}
+        .eng-stat{background:var(--bg-2);border-radius:10px;padding:0.7rem;text-align:center;border:1px solid var(--border);}
+        .eng-val{font-size:1.2rem;font-weight:800;font-family:'JetBrains Mono',monospace;}
+        .eng-label{font-size:0.58rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.1rem;}
+
+        /* Signal weights */
+        .signal-section{background:var(--bg-2);border-radius:12px;padding:1rem;}
+        .signal-title{font-size:0.78rem;font-weight:600;margin-bottom:0.6rem;}
+        .signal-row{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.45rem;}
+        .signal-label{font-size:0.68rem;width:80px;color:var(--text-2);}
+        .signal-track{flex:1;height:20px;background:var(--bg-0);border-radius:6px;overflow:hidden;}
+        .signal-fill{height:100%;border-radius:6px;transition:width 0.6s ease;display:flex;align-items:center;padding-left:0.4rem;}
+        .signal-fill span{font-size:0.55rem;font-family:'JetBrains Mono',monospace;font-weight:600;color:white;}
+
+        /* User profile */
+        .profile-section{background:var(--bg-2);border-radius:12px;padding:1rem;}
+        .profile-title{font-size:0.78rem;font-weight:600;margin-bottom:0.6rem;}
+        .profile-tag{display:inline-block;font-size:0.6rem;padding:0.2rem 0.5rem;border-radius:5px;margin:0.15rem;border:1px solid var(--border);background:var(--bg-0);color:var(--text-1);}
+        .profile-tag.high{border-color:var(--lem-orange);color:var(--lem-orange);background:rgba(249,115,22,0.08);}
+
+        /* Latency gauge */
+        .latency-section{background:var(--bg-2);border-radius:12px;padding:1rem;text-align:center;}
+        .latency-val{font-size:2.2rem;font-weight:900;font-family:'JetBrains Mono',monospace;color:var(--lem-orange);}
+        .latency-unit{font-size:0.8rem;color:var(--text-3);}
+        .latency-label{font-size:0.65rem;color:var(--text-3);margin-top:0.3rem;}
+        .latency-bar-track{height:6px;background:var(--bg-0);border-radius:3px;margin-top:0.5rem;overflow:hidden;}
+        .latency-bar-fill{height:100%;border-radius:3px;background:var(--grad);transition:width 0.5s;}
+
+        .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--bg-1);border:1px solid var(--border);border-radius:12px;padding:0.8rem 1.15rem;display:flex;align-items:center;gap:0.5rem;box-shadow:0 15px 50px rgba(0,0,0,0.6);transform:translateY(100px);opacity:0;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);z-index:1000;}
+        .toast.show{transform:translateY(0);opacity:1;}
+        .toast-icon{font-size:1.2rem;}.toast-title{font-size:0.8rem;font-weight:600;}.toast-msg{font-size:0.65rem;color:var(--text-3);}
+
+        ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg-0);}::-webkit-scrollbar-thumb{background:var(--bg-3);border-radius:3px;}
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-inner">
+        <div class="logo">
+            <div class="logo-mark">🎯</div>
+            <div>
+                <div class="logo-name">ConvoRec-Engine</div>
+                <div class="logo-sub">Lemrock · Hybrid Recommender</div>
+            </div>
+        </div>
+        <div class="badges">
+            <span class="badge live">Live Ranking</span>
+            <span class="badge">Collaborative + Semantic</span>
+            <span class="badge">Context-Aware</span>
+            <span class="badge">&lt;50ms p95</span>
+        </div>
+    </div>
+</header>
+
+<main class="main">
+    <div class="hero">
+        <h1>🎯 Hybrid Conversational Recommender</h1>
+        <p>Collaborative filtering × LLM context extraction × real-time product ranking inside chat interfaces</p>
+    </div>
+
+    <div class="workspace">
+        <!-- CHAT -->
+        <div class="card">
+            <div class="card-head">
+                <h3 class="card-title">💬 Conversational Interface</h3>
+                <span style="font-size:0.65rem;color:var(--text-3);font-family:'JetBrains Mono',monospace;">Simulated Agent</span>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div class="chat-window">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-msg system">ConvoRec-Engine v2 initialized · Hybrid ranking active</div>
+                    </div>
+                    <div class="chat-input-wrap">
+                        <input class="chat-input" id="chatInput" placeholder="Type a shopping query..." onkeydown="if(event.key==='Enter')sendMessage()">
+                        <button class="send-btn" onclick="sendMessage()">Send →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECOMMENDATIONS -->
+        <div class="card">
+            <div class="card-head">
+                <h3 class="card-title">🛍️ Ranked Recommendations</h3>
+                <span style="font-size:0.65rem;color:var(--text-3);" id="recCount">0 results</span>
+            </div>
+            <div class="card-body">
+                <div class="rec-grid" id="recGrid">
+                    <div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:3rem;">
+                        Start a conversation to see ranked product recommendations
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-head"><h3 class="card-title">⚡ Engine Metrics</h3></div>
+                <div class="card-body">
+                    <div class="engine-stats">
+                        <div class="eng-stat"><div class="eng-val" id="engLatency" style="color:var(--lem-orange);">—</div><div class="eng-label">Latency (ms)</div></div>
+                        <div class="eng-stat"><div class="eng-val" id="engNDCG" style="color:var(--lem-emerald);">—</div><div class="eng-label">nDCG@10</div></div>
+                        <div class="eng-stat"><div class="eng-val" id="engCTR" style="color:var(--lem-cyan);">—</div><div class="eng-label">Pred. CTR</div></div>
+                        <div class="eng-stat"><div class="eng-val" id="engCandidates" style="color:var(--lem-violet);">—</div><div class="eng-label">Candidates</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3 class="card-title">⚖️ Signal Weights</h3></div>
+                <div class="card-body">
+                    <div class="signal-section">
+                        <div class="signal-title">Ranking Factor Mix</div>
+                        <div class="signal-row"><span class="signal-label">Collaborative</span><div class="signal-track"><div class="signal-fill" id="sigCollab" style="width:35%;background:linear-gradient(90deg,var(--lem-blue),#60a5fa);"><span>35%</span></div></div></div>
+                        <div class="signal-row"><span class="signal-label">Semantic</span><div class="signal-track"><div class="signal-fill" id="sigSemantic" style="width:28%;background:linear-gradient(90deg,var(--lem-violet),#a78bfa);"><span>28%</span></div></div></div>
+                        <div class="signal-row"><span class="signal-label">Context</span><div class="signal-track"><div class="signal-fill" id="sigContext" style="width:22%;background:linear-gradient(90deg,var(--lem-cyan),#22d3ee);"><span>22%</span></div></div></div>
+                        <div class="signal-row"><span class="signal-label">Price Match</span><div class="signal-track"><div class="signal-fill" id="sigPrice" style="width:15%;background:linear-gradient(90deg,var(--lem-emerald),#34d399);"><span>15%</span></div></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3 class="card-title">👤 Extracted User Profile</h3></div>
+                <div class="card-body">
+                    <div class="profile-section">
+                        <div class="profile-title">Context Signals (LLM-extracted)</div>
+                        <div id="profileTags">
+                            <span class="profile-tag" style="color:var(--text-3);">No context yet</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><h3 class="card-title">⏱️ P95 Latency</h3></div>
+                <div class="card-body">
+                    <div class="latency-section">
+                        <div class="latency-val" id="p95Val">—</div>
+                        <div class="latency-unit">milliseconds</div>
+                        <div class="latency-label">End-to-end ranking latency (p95)</div>
+                        <div class="latency-bar-track"><div class="latency-bar-fill" id="p95Bar" style="width:0%;"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div class="toast" id="toast">
+    <span class="toast-icon" id="toastIcon">✅</span>
+    <div><div class="toast-title" id="toastTitle"></div><div class="toast-msg" id="toastMsg"></div></div>
+</div>
+
+<script>
+const brands = ['Leroy Merlin','Cdiscount','Maisons du Monde','Darty','Fnac','Rakuten','Decathlon','Lidl','Conforama'];
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const rand = (lo,hi) => lo + Math.random()*(hi-lo);
+
+let recCounter = 0;
+const profileSignals = new Set();
+
+const scenarios = [
+    {
+        query: "I just moved into a 42m² apartment in Paris, need furniture ideas",
+        context: ["paris","small-apartment","42m²","first-time-buyer","budget-conscious"],
+        products: [
+            {name:"Modular Sofa Bed — 2-in-1 Compact",brand:"Maisons du Monde",price:449,tags:["collab","context","price"],why:"Small-space optimized + high conversion in similar user profiles"},
+            {name:"Expandable Dining Table (80→120cm)",brand:"Leroy Merlin",price:189,tags:["semantic","context"],why:"Semantic match: 'small apartment' → space-saving furniture cluster"},
+            {name:"Wall-Mounted Desk — Oak Finish",brand:"Cdiscount",price:129,tags:["collab","semantic","price"],why:"Collaborative: 85% of 'first apartment' users also viewed this"},
+            {name:"Stackable Storage Cubes (Set of 6)",brand:"Leroy Merlin",price:79,tags:["context","price"],why:"Context signal: budget-conscious + maximizing 42m²"},
+            {name:"Smart LED Floor Lamp — Dimmable",brand:"Darty",price:69,tags:["collab","semantic"],why:"Cross-category lift: 73% co-purchase rate with compact furniture"},
+        ]
+    },
+    {
+        query: "Looking for the best espresso machine under €300, I like strong coffee",
+        context: ["espresso","strong-coffee","budget-€300","kitchen","quality-focused"],
+        products: [
+            {name:"De'Longhi Dedica Arte EC885",brand:"Darty",price:249,tags:["collab","semantic","price"],why:"#1 ranked for 'strong espresso' intent, 15 bar pressure"},
+            {name:"Sage Bambino Plus",brand:"Fnac",price:279,tags:["semantic","context"],why:"Semantic match: 'strong coffee' → high-pressure extraction models"},
+            {name:"Krups Virtuoso XP442C",brand:"Cdiscount",price:179,tags:["collab","price"],why:"Collaborative: top pick for price-sensitive espresso enthusiasts"},
+            {name:"illy X1 Anniversary — Red",brand:"Rakuten",price:289,tags:["semantic","collab"],why:"Style + substance: premium design with strong extraction"},
+            {name:"Bialetti Moka Express (6-Cup)",brand:"Cdiscount",price:32,tags:["context","price"],why:"Budget diversification: stovetop alternative from context signals"},
+        ]
+    },
+    {
+        query: "I need running shoes for marathon training, pronation support",
+        context: ["marathon","running","pronation","sport","endurance","performance"],
+        products: [
+            {name:"ASICS Gel-Kayano 30",brand:"Decathlon",price:189,tags:["collab","semantic","context"],why:"#1 stability shoe for pronation — 92% satisfaction in marathon segment"},
+            {name:"Brooks Adrenaline GTS 24",brand:"Decathlon",price:159,tags:["semantic","price"],why:"Semantic match: 'pronation support' + marathon distance category"},
+            {name:"New Balance Fresh Foam 860v14",brand:"Cdiscount",price:139,tags:["collab","context"],why:"Collaborative: 78% of pronation runners also considered this"},
+            {name:"Saucony Guide 17",brand:"Rakuten",price:149,tags:["semantic","collab"],why:"High re-purchase rate in the marathon training segment"},
+            {name:"Decathlon Kiprun KS900 Light",brand:"Decathlon",price:89,tags:["price","context"],why:"Budget option with adequate stability for training runs"},
+        ]
+    },
+    {
+        query: "Smart home setup — I want to control lights and heating remotely",
+        context: ["smart-home","IoT","lighting","heating","remote-control","automation"],
+        products: [
+            {name:"Philips Hue Starter Kit (3 Bulbs + Bridge)",brand:"Darty",price:129,tags:["collab","semantic"],why:"Entry point for smart lighting — 89% satisfaction score"},
+            {name:"Tado Smart Thermostat V3+",brand:"Leroy Merlin",price:199,tags:["semantic","context"],why:"Semantic match: 'heating + remote control' → smart thermostat cluster"},
+            {name:"Google Nest Hub (2nd Gen)",brand:"Fnac",price:79,tags:["collab","context"],why:"Hub device — 82% co-purchase with smart lighting/heating"},
+            {name:"IKEA TRÅDFRI Smart Plug Kit",brand:"Cdiscount",price:29,tags:["price","collab"],why:"Budget automation entry — extends control to non-smart devices"},
+            {name:"Eve Motion Sensor",brand:"Darty",price:39,tags:["semantic","context"],why:"Automation trigger: completes the smart-home control loop"},
+        ]
+    },
+    {
+        query: "Gift ideas for my partner who loves cooking and Japanese food",
+        context: ["gift","cooking","japanese-food","partner","premium","culinary"],
+        products: [
+            {name:"Miyabi Koh 20cm Chef's Knife",brand:"Fnac",price:149,tags:["semantic","context"],why:"Semantic match: 'Japanese food + cooking' → Japanese knife cluster"},
+            {name:"Le Creuset Cast Iron Wok — 36cm",brand:"Maisons du Monde",price:229,tags:["collab","semantic"],why:"Premium cooking gift — 88% gift conversion in this category"},
+            {name:"Kyocera Ceramic Mandoline Slicer",brand:"Cdiscount",price:39,tags:["context","price"],why:"Context: Japanese cuisine prep + accessible gift price point"},
+            {name:"MasterClass Sushi Making Kit",brand:"Rakuten",price:24,tags:["semantic","context","price"],why:"Experience-based gift matching 'Japanese food' context"},
+            {name:"Staub Cocotte — Campagne 24cm",brand:"Darty",price:199,tags:["collab"],why:"High gift-intent conversion: premium cookware for enthusiasts"},
+        ]
+    }
+];
+
+const quickQueries = [
+    "I just moved into a 42m² apartment in Paris, need furniture ideas",
+    "Looking for the best espresso machine under €300, I like strong coffee",
+    "I need running shoes for marathon training, pronation support",
+    "Smart home setup — I want to control lights and heating remotely",
+    "Gift ideas for my partner who loves cooking and Japanese food"
+];
+
+let currentScenario = -1;
+let queryIndex = 0;
+
+function addChatMsg(text, type) {
+    const msgs = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.className = 'chat-msg ' + type;
+    el.textContent = text;
+    msgs.appendChild(el);
+    msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    let text = input.value.trim();
+    if (!text) {
+        text = quickQueries[queryIndex % quickQueries.length];
+        queryIndex++;
+    }
+    input.value = '';
+
+    addChatMsg(text, 'user');
+
+    // Find matching scenario
+    let scenario = null;
+    const lower = text.toLowerCase();
+    for (const s of scenarios) {
+        const keywords = s.query.toLowerCase().split(' ').filter(w => w.length > 3);
+        const matches = keywords.filter(k => lower.includes(k)).length;
+        if (matches >= 2) { scenario = s; break; }
+    }
+    if (!scenario) {
+        scenario = scenarios[queryIndex % scenarios.length];
+    }
+    currentScenario = scenarios.indexOf(scenario);
+
+    // Simulate processing
+    addChatMsg('🔄 Analyzing intent & extracting context...', 'system');
+
+    setTimeout(() => {
+        // Extract context
+        scenario.context.forEach(c => profileSignals.add(c));
+        updateProfileTags();
+
+        // Agent response
+        const topProd = scenario.products[0];
+        addChatMsg(
+            `Based on your needs, I'd recommend the ${topProd.name} from ${topProd.brand} at €${topProd.price}. I've also ranked ${scenario.products.length - 1} more options by relevance — check the recommendation panel →`,
+            'agent'
+        );
+
+        // Populate recommendations
+        populateRecs(scenario.products);
+        updateEngineMetrics();
+        updateSignalWeights();
+        updateLatency();
+
+        toast('🎯', 'Recommendations Updated', `${scenario.products.length} products ranked in ${Math.floor(20 + Math.random() * 25)}ms`);
+    }, 800);
+}
+
+function populateRecs(products) {
+    const grid = document.getElementById('recGrid');
+    grid.innerHTML = '';
+    recCounter++;
+
+    products.forEach((p, i) => {
+        const score = (0.97 - i * 0.06 + Math.random() * 0.02).toFixed(3);
+        const el = document.createElement('div');
+        el.className = 'rec-card';
+        el.style.animationDelay = (i * 0.08) + 's';
+        el.innerHTML = `
+            <div class="rec-header">
+                <div>
+                    <div class="rec-name">${p.name}</div>
+                    <div class="rec-brand">${p.brand} · Rank #${i + 1}</div>
+                </div>
+                <div class="rec-score">${score}</div>
+            </div>
+            <div class="rec-price">€${p.price}</div>
+            <div class="rec-tags">
+                ${p.tags.map(t => {
+                    const labels = { collab: 'COLLAB', semantic: 'SEMANTIC', context: 'CONTEXT', price: 'PRICE' };
+                    return `<span class="rec-tag ${t}">${labels[t]}</span>`;
+                }).join('')}
+            </div>
+            <div class="rec-why">${p.why}</div>
+        `;
+        grid.appendChild(el);
+    });
+
+    document.getElementById('recCount').textContent = products.length + ' results';
+}
+
+function updateEngineMetrics() {
+    document.getElementById('engLatency').textContent = Math.floor(18 + Math.random() * 30);
+    document.getElementById('engNDCG').textContent = (0.82 + Math.random() * 0.12).toFixed(3);
+    document.getElementById('engCTR').textContent = (12 + Math.random() * 18).toFixed(1) + '%';
+    document.getElementById('engCandidates').textContent = Math.floor(800 + Math.random() * 3000).toLocaleString();
+}
+
+function updateSignalWeights() {
+    // Dynamic weights based on context richness
+    const contextWeight = Math.min(15 + profileSignals.size * 2, 35);
+    const semanticWeight = 25 + Math.random() * 8;
+    const collabWeight = 100 - contextWeight - semanticWeight - 12;
+    const priceWeight = 12 + Math.random() * 5;
+
+    const total = collabWeight + semanticWeight + contextWeight + priceWeight;
+    [{id:'sigCollab',v:collabWeight},{id:'sigSemantic',v:semanticWeight},{id:'sigContext',v:contextWeight},{id:'sigPrice',v:priceWeight}].forEach(({id, v}) => {
+        const pct = (v / total * 100).toFixed(0);
+        const el = document.getElementById(id);
+        el.style.width = pct + '%';
+        el.querySelector('span').textContent = pct + '%';
+    });
+}
+
+function updateProfileTags() {
+    const container = document.getElementById('profileTags');
+    container.innerHTML = [...profileSignals].map(s => {
+        const isHigh = profileSignals.size > 3 && Math.random() > 0.4;
+        return `<span class="profile-tag ${isHigh ? 'high' : ''}">${s}</span>`;
+    }).join('');
+}
+
+function updateLatency() {
+    const p95 = Math.floor(25 + Math.random() * 30);
+    document.getElementById('p95Val').textContent = p95;
+    document.getElementById('p95Bar').style.width = Math.min((p95 / 80) * 100, 100) + '%';
+}
+
+function toast(icon, title, msg) {
+    document.getElementById('toastIcon').textContent = icon;
+    document.getElementById('toastTitle').textContent = title;
+    document.getElementById('toastMsg').textContent = msg;
+    const t = document.getElementById('toast');
+    t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Auto-populate quick queries as placeholder cycling
+let phIdx = 0;
+setInterval(() => {
+    const input = document.getElementById('chatInput');
+    if (!input.value) {
+        input.placeholder = quickQueries[phIdx % quickQueries.length];
+        phIdx++;
+    }
+}, 3000);
+</script>
+</body>
+</html>
